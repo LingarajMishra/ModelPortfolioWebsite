@@ -18,13 +18,19 @@ export default function PhotoView() {
         const response = await fetch('/data/photos.json');
         if (response.ok) {
           const allPhotos = await response.json();
-          return allPhotos.find(p => p.id === parseInt(id));
+          const foundPhoto = allPhotos.find((p: Photo) => p.id === parseInt(id));
+          if (foundPhoto) {
+            return foundPhoto;
+          }
         }
       } catch (e) {
         console.log('Falling back to API');
       }
       // Fall back to API if static data is not available
       const response = await fetch(`/api/photos/${id}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch photo');
+      }
       return response.json();
     }
   });
