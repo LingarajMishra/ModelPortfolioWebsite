@@ -9,6 +9,20 @@ import type { Photo } from "@shared/schema";
 export default function Home() {
   const { data: photos, isLoading } = useQuery<Photo[]>({
     queryKey: ["/api/photos/featured"],
+    async queryFn() {
+      // Try to fetch from static data first
+      try {
+        const response = await fetch('/data/featured.json');
+        if (response.ok) {
+          return response.json();
+        }
+      } catch (e) {
+        console.log('Falling back to API');
+      }
+      // Fall back to API if static data is not available
+      const response = await fetch('/api/photos/featured');
+      return response.json();
+    }
   });
 
   return (

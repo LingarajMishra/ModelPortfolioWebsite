@@ -9,9 +9,24 @@ import { Button } from "@/components/ui/button";
 
 export default function PhotoView() {
   const { id } = useParams<{ id: string }>();
-  
+
   const { data: photo, isLoading } = useQuery<Photo>({
     queryKey: [`/api/photos/${id}`],
+    async queryFn() {
+      // Try to fetch from static data first
+      try {
+        const response = await fetch('/data/photos.json');
+        if (response.ok) {
+          const allPhotos = await response.json();
+          return allPhotos.find(p => p.id === parseInt(id));
+        }
+      } catch (e) {
+        console.log('Falling back to API');
+      }
+      // Fall back to API if static data is not available
+      const response = await fetch(`/api/photos/${id}`);
+      return response.json();
+    }
   });
 
   if (isLoading) {
@@ -46,7 +61,7 @@ export default function PhotoView() {
           </Link>
         </Button>
       </div>
-      
+
       <Card>
         <CardContent className="p-0">
           <img

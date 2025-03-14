@@ -6,9 +6,27 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function Gallery() {
   const [category, setCategory] = useState<string>("all");
-  
+
   const { data: photos, isLoading } = useQuery<Photo[]>({
     queryKey: ["/api/photos", category !== "all" ? category : undefined],
+    async queryFn() {
+      // Try to fetch from static data first
+      try {
+        const response = await fetch('/data/photos.json');
+        if (response.ok) {
+          const allPhotos = await response.json();
+          // Filter by category if needed
+          return category !== "all" 
+            ? allPhotos.filter(photo => photo.category === category)
+            : allPhotos;
+        }
+      } catch (e) {
+        console.log('Falling back to API');
+      }
+      // Fall back to API if static data is not available
+      const response = await fetch(`/api/photos${category !== "all" ? `?category=${category}` : ''}`);
+      return response.json();
+    }
   });
 
   return (
