@@ -59,7 +59,6 @@ export class MemStorage implements IStorage {
         const url = blobClient.url;
 
         // Create a photo entry for each blob
-        // Using the blob name to extract potential title and category
         const [timestamp, title] = blob.name.split('-');
         const photo: Photo = {
           id: this.currentId++,
