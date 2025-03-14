@@ -5,14 +5,28 @@ import { BlobServiceClient, BlobSASPermissions } from "@azure/storage-blob";
 import { insertPhotoSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  if (!process.env.AZURE_STORAGE_CONNECTION_STRING) {
+  const azureKey = process.env.AZURE_STORAGE_CONNECTION_STRING?.trim();
+  if (!azureKey) {
     throw new Error("Azure Storage connection string not found");
   }
 
-  const blobServiceClient = BlobServiceClient.fromConnectionString(
-    process.env.AZURE_STORAGE_CONNECTION_STRING
-  );
-  const containerName = "portfolio-photos";
+  console.log("Creating Blob Service Client...");
+  let blobServiceClient: BlobServiceClient;
+  try {
+    if (azureKey.startsWith("https://")) {
+      console.log("Using SAS URL for Azure Blob Storage");
+      blobServiceClient = new BlobServiceClient(azureKey);
+    } else {
+      console.log("Using connection string for Azure Blob Storage");
+      blobServiceClient = BlobServiceClient.fromConnectionString(azureKey);
+    }
+    console.log("Blob Service Client created successfully");
+  } catch (error) {
+    console.error("Failed to create Blob Service Client:", error);
+    throw error;
+  }
+
+  const containerName = "myphoto";
 
   app.get("/api/photos", async (req, res) => {
     try {
@@ -22,6 +36,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         : await storage.getPhotos();
       res.json(photos);
     } catch (error) {
+      console.error("Error fetching photos:", error);
       res.status(500).json({ message: "Failed to fetch photos" });
     }
   });
@@ -31,6 +46,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const photos = await storage.getFeaturedPhotos();
       res.json(photos);
     } catch (error) {
+      console.error("Error fetching featured photos:", error);
       res.status(500).json({ message: "Failed to fetch featured photos" });
     }
   });
@@ -40,11 +56,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const photoData = insertPhotoSchema.parse(req.body);
       const containerClient = blobServiceClient.getContainerClient(containerName);
 
-      // Generate unique blob name
       const blobName = `${Date.now()}-${photoData.title.toLowerCase().replace(/\s+/g, '-')}`;
       const blockBlobClient = containerClient.getBlockBlobClient(blobName);
 
-      // Get upload URL
       const sasUrl = await blockBlobClient.generateSasUrl({
         permissions: BlobSASPermissions.parse("w"),
         expiresOn: new Date(Date.now() + 1000 * 60 * 15), // 15 minutes
@@ -52,6 +66,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ uploadUrl: sasUrl, blobName });
     } catch (error) {
+      console.error("Error generating upload URL:", error);
       res.status(500).json({ message: "Failed to generate upload URL" });
     }
   });

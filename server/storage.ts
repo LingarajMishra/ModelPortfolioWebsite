@@ -14,78 +14,55 @@ export class MemStorage implements IStorage {
   private photos: Map<number, Photo>;
   private currentId: number;
   private blobServiceClient: BlobServiceClient;
-  private containerName = "portfolio-photos";
-  private containerInitialized = false;
+  private containerName = "myphoto";
 
   constructor() {
     this.photos = new Map();
     this.currentId = 1;
 
-    if (!process.env.AZURE_STORAGE_CONNECTION_STRING) {
+    const azureKey = process.env.AZURE_STORAGE_CONNECTION_STRING?.trim();
+    if (!azureKey) {
       throw new Error("Azure Storage connection string not found");
-    }
-
-    const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING.trim();
-    if (!connectionString.startsWith("DefaultEndpointsProtocol=")) {
-      throw new Error("Invalid Azure Storage connection string format");
     }
 
     try {
       console.log("Initializing Azure Blob Service Client...");
-      console.log(`Connection string length: ${connectionString.length}`);
-      console.log(`Connection string starts with: ${connectionString.substring(0, 25)}...`);
-
-      this.blobServiceClient = BlobServiceClient.fromConnectionString(connectionString);
+      // Check if the key is a SAS URL or connection string
+      if (azureKey.startsWith("https://")) {
+        console.log("Using SAS URL for Azure Blob Storage");
+        this.blobServiceClient = new BlobServiceClient(azureKey);
+      } else {
+        console.log("Using connection string for Azure Blob Storage");
+        this.blobServiceClient = BlobServiceClient.fromConnectionString(azureKey);
+      }
       console.log("Azure Blob Service Client initialized successfully");
     } catch (error) {
       console.error("Failed to initialize Azure Blob Service Client:", error);
-      throw new Error("Failed to initialize storage service. Please check your connection string.");
-    }
-  }
-
-  private async ensureContainerInitialized() {
-    if (this.containerInitialized) return;
-
-    try {
-      console.log(`Initializing container: ${this.containerName}`);
-      const containerClient = this.blobServiceClient.getContainerClient(this.containerName);
-      await containerClient.createIfNotExists({
-        access: 'blob' // Allow public read access to blobs
-      });
-      console.log(`Container ${this.containerName} initialized successfully`);
-      this.containerInitialized = true;
-    } catch (error) {
-      console.error("Failed to initialize container:", error);
-      throw new Error(`Failed to initialize storage container: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error("Failed to initialize storage service");
     }
   }
 
   async getPhotos(): Promise<Photo[]> {
-    await this.ensureContainerInitialized();
     return Array.from(this.photos.values());
   }
 
   async getPhotosByCategory(category: string): Promise<Photo[]> {
-    await this.ensureContainerInitialized();
     return Array.from(this.photos.values()).filter(
       (photo) => photo.category === category
     );
   }
 
   async getFeaturedPhotos(): Promise<Photo[]> {
-    await this.ensureContainerInitialized();
     return Array.from(this.photos.values()).filter(
       (photo) => photo.featured === true
     );
   }
 
   async getPhoto(id: number): Promise<Photo | undefined> {
-    await this.ensureContainerInitialized();
     return this.photos.get(id);
   }
 
   async createPhoto(insertPhoto: InsertPhoto): Promise<Photo> {
-    await this.ensureContainerInitialized();
     const id = this.currentId++;
     const photo: Photo = {
       id,
@@ -101,7 +78,6 @@ export class MemStorage implements IStorage {
   }
 
   async deletePhoto(id: number): Promise<void> {
-    await this.ensureContainerInitialized();
     const photo = await this.getPhoto(id);
     if (!photo) throw new Error("Photo not found");
 
