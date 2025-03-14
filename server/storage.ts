@@ -1,5 +1,5 @@
 import { photos, type Photo, type InsertPhoto } from "@shared/schema";
-import { BlobServiceClient } from "@azure/storage-blob";
+import { ContainerClient } from "@azure/storage-blob";
 
 export interface IStorage {
   getPhotos(): Promise<Photo[]>;
@@ -13,52 +13,41 @@ export interface IStorage {
 export class MemStorage implements IStorage {
   private photos: Map<number, Photo>;
   private currentId: number;
-  private blobServiceClient: BlobServiceClient;
-  private containerName = "myphoto";
+  private containerClient: ContainerClient;
 
   constructor() {
     this.photos = new Map();
     this.currentId = 1;
 
-    const azureKey = process.env.AZURE_STORAGE_CONNECTION_STRING?.trim();
-    if (!azureKey) {
-      throw new Error("Azure Storage connection string not found");
+    const azureUrl = process.env.AZURE_STORAGE_CONNECTION_STRING?.trim();
+    if (!azureUrl) {
+      throw new Error("Azure Storage SAS URL not found");
     }
 
     try {
-      console.log("Initializing Azure Blob Service Client...");
-      // Check if the key is a SAS URL or connection string
-      if (azureKey.startsWith("https://")) {
-        console.log("Using SAS URL for Azure Blob Storage");
-        this.blobServiceClient = new BlobServiceClient(azureKey);
-      } else {
-        console.log("Using connection string for Azure Blob Storage");
-        this.blobServiceClient = BlobServiceClient.fromConnectionString(azureKey);
-      }
-      console.log("Azure Blob Service Client initialized successfully");
+      console.log("Initializing Azure Container Client...");
+      this.containerClient = new ContainerClient(azureUrl);
+      console.log("Azure Container Client initialized successfully");
 
       // Initialize existing photos from blob storage
       this.initializeFromBlobStorage().catch(error => {
         console.error("Failed to initialize from blob storage:", error);
       });
     } catch (error) {
-      console.error("Failed to initialize Azure Blob Service Client:", error);
-      throw new Error("Failed to initialize storage service");
+      console.error("Failed to initialize Azure Container Client:", error);
+      throw error;
     }
   }
 
   private async initializeFromBlobStorage() {
     try {
       console.log("Loading existing photos from blob storage...");
-      const containerClient = this.blobServiceClient.getContainerClient(this.containerName);
-      const blobs = containerClient.listBlobsFlat();
+      const blobs = this.containerClient.listBlobsFlat();
 
       for await (const blob of blobs) {
-        // Get the blob URL
-        const blobClient = containerClient.getBlobClient(blob.name);
+        const blobClient = this.containerClient.getBlobClient(blob.name);
         const url = blobClient.url;
 
-        // Create a photo entry for each blob
         const [timestamp, title] = blob.name.split('-');
         const photo: Photo = {
           id: this.currentId++,
@@ -119,9 +108,8 @@ export class MemStorage implements IStorage {
     if (!photo) throw new Error("Photo not found");
 
     // Delete from blob storage
-    const containerClient = this.blobServiceClient.getContainerClient(this.containerName);
-    const blockBlobClient = containerClient.getBlockBlobClient(photo.blobName);
-    await blockBlobClient.delete();
+    const blobClient = this.containerClient.getBlobClient(photo.blobName);
+    await blobClient.delete();
 
     this.photos.delete(id);
   }

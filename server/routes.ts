@@ -1,32 +1,24 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { BlobServiceClient, BlobSASPermissions } from "@azure/storage-blob";
+import { ContainerClient, BlobSASPermissions } from "@azure/storage-blob";
 import { insertPhotoSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  const azureKey = process.env.AZURE_STORAGE_CONNECTION_STRING?.trim();
-  if (!azureKey) {
-    throw new Error("Azure Storage connection string not found");
+  const azureUrl = process.env.AZURE_STORAGE_CONNECTION_STRING?.trim();
+  if (!azureUrl) {
+    throw new Error("Azure Storage SAS URL not found");
   }
 
-  console.log("Creating Blob Service Client...");
-  let blobServiceClient: BlobServiceClient;
+  console.log("Creating Container Client...");
+  let containerClient: ContainerClient;
   try {
-    if (azureKey.startsWith("https://")) {
-      console.log("Using SAS URL for Azure Blob Storage");
-      blobServiceClient = new BlobServiceClient(azureKey);
-    } else {
-      console.log("Using connection string for Azure Blob Storage");
-      blobServiceClient = BlobServiceClient.fromConnectionString(azureKey);
-    }
-    console.log("Blob Service Client created successfully");
+    containerClient = new ContainerClient(azureUrl);
+    console.log("Container Client created successfully");
   } catch (error) {
-    console.error("Failed to create Blob Service Client:", error);
+    console.error("Failed to create Container Client:", error);
     throw error;
   }
-
-  const containerName = "myphoto";
 
   app.get("/api/photos", async (req, res) => {
     try {
@@ -54,11 +46,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/photos/upload", async (req, res) => {
     try {
       const photoData = insertPhotoSchema.parse(req.body);
-      const containerClient = blobServiceClient.getContainerClient(containerName);
-
       const blobName = `${Date.now()}-${photoData.title.toLowerCase().replace(/\s+/g, '-')}`;
       const blockBlobClient = containerClient.getBlockBlobClient(blobName);
 
+      // For uploads, we'll generate a temporary SAS URL with write permissions
       const sasUrl = await blockBlobClient.generateSasUrl({
         permissions: BlobSASPermissions.parse("w"),
         expiresOn: new Date(Date.now() + 1000 * 60 * 15), // 15 minutes
