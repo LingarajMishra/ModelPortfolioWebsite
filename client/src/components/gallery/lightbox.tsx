@@ -1,5 +1,7 @@
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { X, Share2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import type { Photo } from "@shared/schema";
 
 interface LightboxProps {
@@ -8,19 +10,44 @@ interface LightboxProps {
 }
 
 export default function Lightbox({ photo, onClose }: LightboxProps) {
+  const { toast } = useToast();
+
   if (!photo) return null;
+
+  const handleShare = () => {
+    const url = `${window.location.origin}/photo/${photo.id}`;
+    navigator.clipboard.writeText(url).then(() => {
+      toast({
+        title: "Link copied!",
+        description: "Photo link has been copied to your clipboard.",
+      });
+    });
+  };
 
   return (
     <Dialog open={Boolean(photo)} onOpenChange={() => onClose()}>
       <DialogContent className="max-w-screen-lg">
-        <button
-          onClick={onClose}
-          className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-        >
-          <X className="h-4 w-4" />
-          <span className="sr-only">Close</span>
-        </button>
-        <div className="mt-6">
+        <div className="flex justify-between items-center">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={handleShare}
+          >
+            <Share2 className="h-4 w-4" />
+            <span className="sr-only">Share photo</span>
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={onClose}
+          >
+            <X className="h-4 w-4" />
+            <span className="sr-only">Close</span>
+          </Button>
+        </div>
+        <div className="mt-4">
           <img
             src={photo.url}
             alt={photo.title}

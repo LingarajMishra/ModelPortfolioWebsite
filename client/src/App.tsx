@@ -6,6 +6,7 @@ import Navigation from "@/components/layout/navigation";
 import Home from "@/pages/home";
 import Gallery from "@/pages/gallery";
 import Contact from "@/pages/contact";
+import PhotoView from "@/pages/photo";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -13,6 +14,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/gallery" component={Gallery} />
+      <Route path="/photo/:id" component={PhotoView} />
       <Route path="/contact" component={Contact} />
       <Route component={NotFound} />
     </Switch>

@@ -20,6 +20,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     throw error;
   }
 
+  app.get("/api/photos/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid photo ID" });
+      }
+
+      const photo = await storage.getPhoto(id);
+      if (!photo) {
+        return res.status(404).json({ message: "Photo not found" });
+      }
+
+      res.json(photo);
+    } catch (error) {
+      console.error("Error fetching photo:", error);
+      res.status(500).json({ message: "Failed to fetch photo" });
+    }
+  });
+
   app.get("/api/photos", async (req, res) => {
     try {
       const category = req.query.category as string | undefined;
