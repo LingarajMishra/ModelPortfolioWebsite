@@ -20,6 +20,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     throw error;
   }
 
+  // Featured photos endpoint - must be before the /:id endpoint
+  app.get("/api/photos/featured", async (req, res) => {
+    try {
+      const photos = await storage.getFeaturedPhotos();
+      res.json(photos);
+    } catch (error) {
+      console.error("Error fetching featured photos:", error);
+      res.status(500).json({ message: "Failed to fetch featured photos" });
+    }
+  });
+
   app.get("/api/photos/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -52,21 +63,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/photos/featured", async (req, res) => {
-    try {
-      const photos = await storage.getFeaturedPhotos();
-      res.json(photos);
-    } catch (error) {
-      console.error("Error fetching featured photos:", error);
-      res.status(500).json({ message: "Failed to fetch featured photos" });
-    }
-  });
-
   app.post("/api/photos/upload", async (req, res) => {
     try {
       const photoData = insertPhotoSchema.parse(req.body);
       const blobName = `${Date.now()}-${photoData.title.toLowerCase().replace(/\s+/g, '-')}`;
-      const blockBlobClient = containerClient.getBlockBlobClient(blobName);
+      const blockBlobClient = containerClient.getBlobClient(blobName);
 
       // For uploads, we'll generate a temporary SAS URL with write permissions
       const sasUrl = await blockBlobClient.generateSasUrl({
