@@ -43,6 +43,7 @@ export class MemStorage implements IStorage {
     try {
       console.log("Loading existing photos from blob storage...");
       const blobs = this.containerClient.listBlobsFlat();
+      const allPhotos: Photo[] = [];
 
       for await (const blob of blobs) {
         const blobClient = this.containerClient.getBlobClient(blob.name);
@@ -58,10 +59,22 @@ export class MemStorage implements IStorage {
           blobName: blob.name,
           featured: false
         };
-        this.photos.set(photo.id, photo);
+        allPhotos.push(photo);
       }
 
-      console.log(`Loaded ${this.photos.size} photos from blob storage`);
+      // Randomly select 30% of photos as featured
+      const numFeatured = Math.max(1, Math.floor(allPhotos.length * 0.3));
+      const shuffled = [...allPhotos].sort(() => 0.5 - Math.random());
+      shuffled.slice(0, numFeatured).forEach(photo => {
+        photo.featured = true;
+      });
+
+      // Add all photos to the map
+      allPhotos.forEach(photo => {
+        this.photos.set(photo.id, photo);
+      });
+
+      console.log(`Loaded ${this.photos.size} photos from blob storage (${numFeatured} featured)`);
     } catch (error) {
       console.error("Error loading photos from blob storage:", error);
       throw error;
