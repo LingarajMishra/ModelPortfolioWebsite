@@ -36,9 +36,47 @@ export class MemStorage implements IStorage {
         this.blobServiceClient = BlobServiceClient.fromConnectionString(azureKey);
       }
       console.log("Azure Blob Service Client initialized successfully");
+
+      // Initialize existing photos from blob storage
+      this.initializeFromBlobStorage().catch(error => {
+        console.error("Failed to initialize from blob storage:", error);
+      });
     } catch (error) {
       console.error("Failed to initialize Azure Blob Service Client:", error);
       throw new Error("Failed to initialize storage service");
+    }
+  }
+
+  private async initializeFromBlobStorage() {
+    try {
+      console.log("Loading existing photos from blob storage...");
+      const containerClient = this.blobServiceClient.getContainerClient(this.containerName);
+      const blobs = containerClient.listBlobsFlat();
+
+      for await (const blob of blobs) {
+        // Get the blob URL
+        const blobClient = containerClient.getBlobClient(blob.name);
+        const url = blobClient.url;
+
+        // Create a photo entry for each blob
+        // Using the blob name to extract potential title and category
+        const [timestamp, title] = blob.name.split('-');
+        const photo: Photo = {
+          id: this.currentId++,
+          url,
+          title: title?.replace(/-/g, ' ') || 'Untitled',
+          category: 'portrait', // Default category
+          description: null,
+          blobName: blob.name,
+          featured: false
+        };
+        this.photos.set(photo.id, photo);
+      }
+
+      console.log(`Loaded ${this.photos.size} photos from blob storage`);
+    } catch (error) {
+      console.error("Error loading photos from blob storage:", error);
+      throw error;
     }
   }
 
